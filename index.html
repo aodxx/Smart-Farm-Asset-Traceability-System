@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>นิพนธ์ ฟาร์ม | Smart Farm Asset & Traceability System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/imagekit-javascript@latest/dist/imagekit.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          slate: {
+            950: '#0a0f1a',
+          },
+          brand: {
+            50: '#eef4ff',
+            100: '#dbe7ff',
+            400: '#5b8def',
+            500: '#3568d4',
+            600: '#254ea8',
+            700: '#1c3b82',
+            900: '#122456'
+          }
+        },
+        fontFamily: {
+          sans: ['Inter', 'Noto Sans Thai', 'system-ui', 'sans-serif']
+        }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; }
+  .tab-active { background-color: #1c3b82; color: #fff; }
+  .spinner {
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: #5b8def;
+    border-radius: 50%;
+    width: 20px; height: 20px;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast-enter { animation: toastIn 0.25s ease-out; }
+  @keyframes toastIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: translateY(0); } }
+  .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -8px rgba(0,0,0,0.5); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  input:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #5b8def; }
+  .skeleton { background: linear-gradient(90deg, #1e293b 25%, #263449 37%, #1e293b 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; }
+  @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-24">
+
+<!-- Top bar -->
+<header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center font-bold text-white shadow-lg shadow-brand-900/50">นพ</div>
+      <div>
+        <h1 class="text-base font-bold leading-tight text-white">นิพนธ์ ฟาร์ม</h1>
+        <p class="text-[11px] text-slate-400 leading-tight">Smart Farm Asset & Traceability</p>
+      </div>
+    </div>
+    <button id="refreshBtn" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" title="รีเฟรชข้อมูล">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <nav class="max-w-5xl mx-auto px-4 flex gap-1 overflow-x-auto pb-2">
+    <button data-tab="expenses" class="tab-btn tab-active px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition">🧾 เวชภัณฑ์ & ใบเสร็จ</button>
+    <button data-tab="assets" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 whitespace-nowrap transition">🛠️ ทะเบียนสินทรัพย์</button>
+    <button data-tab="livestock" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 whitespace-nowrap transition">🐖 ทะเบียนสุกร & แม่พันธุ์</button>
+  </nav>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 mt-5 space-y-6">
+
+  <!-- ============ MODULE 1: EXPENSES ============ -->
+  <section id="panel-expenses" class="tab-panel space-y-5">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5">
+      <h2 class="font-bold text-white mb-4 flex items-center gap-2">
+        <span>บันทึกรายจ่าย / ใบเสร็จใหม่</span>
+      </h2>
+      <form id="expenseForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">วันที่</label>
+          <input type="date" name="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">หมวดหมู่</label>
+          <select name="category" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+            <option value="ค่ายา">ค่ายา</option>
+            <option value="ค่าอาหาร">ค่าอาหาร</option>
+            <option value="ค่าซ่อมแซม">ค่าซ่อมแซม</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">จำนวนเงิน (THB)</label>
+          <input type="number" name="amount" step="0.01" min="0" required placeholder="0.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">รูปถ่ายบิล</label>
+          <input type="file" name="photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:text-sm file:font-medium">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-slate-400 mb-1">รายละเอียด</label>
+          <textarea name="description" rows="2" placeholder="รายละเอียดเพิ่มเติม..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        <div class="sm:col-span-2 flex justify-end">
+          <button type="submit" class="submit-btn bg-brand-600 hover:bg-brand-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition">
+            <span class="btn-label">บันทึกรายจ่าย</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold text-white">รายการล่าสุด</h2>
+        <span id="expenseTotal" class="text-xs text-slate-400"></span>
+      </div>
+      <div id="expenseList" class="space-y-2"></div>
+    </div>
+  </section>
+
+  <!-- ============ MODULE 2: ASSETS ============ -->
+  <section id="panel-assets" class="tab-panel hidden space-y-5">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5">
+      <h2 class="font-bold text-white mb-4">เพิ่มสินทรัพย์ / อุปกรณ์</h2>
+      <form id="assetForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">ชื่อสินทรัพย์</label>
+          <input type="text" name="assetName" required placeholder="เช่น รถไถ, ปั๊มน้ำ" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">วันที่รับเข้า</label>
+          <input type="date" name="acquiredDate" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">สภาพการใช้งาน</label>
+          <select name="condition" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+            <option value="ดี">ดี</option>
+            <option value="พอใช้">พอใช้</option>
+            <option value="ต้องซ่อม">ต้องซ่อม</option>
+            <option value="ปลดระวาง">ปลดระวาง</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">รูปถ่ายสินทรัพย์</label>
+          <input type="file" name="photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:text-sm file:font-medium">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-slate-400 mb-1">หมายเหตุ</label>
+          <textarea name="note" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        <div class="sm:col-span-2 flex justify-end">
+          <button type="submit" class="submit-btn bg-brand-600 hover:bg-brand-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition">
+            <span class="btn-label">เพิ่มสินทรัพย์</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 overflow-x-auto">
+      <h2 class="font-bold text-white mb-3">ตารางสินทรัพย์ทั้งหมด</h2>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-400 border-b border-slate-800">
+            <th class="py-2 pr-3 font-medium">รูป</th>
+            <th class="py-2 pr-3 font-medium">ชื่อ</th>
+            <th class="py-2 pr-3 font-medium">วันที่รับเข้า</th>
+            <th class="py-2 pr-3 font-medium">สภาพ</th>
+          </tr>
+        </thead>
+        <tbody id="assetTableBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ MODULE 3: LIVESTOCK ============ -->
+  <section id="panel-livestock" class="tab-panel hidden space-y-5">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5">
+      <h2 class="font-bold text-white mb-4">เพิ่มข้อมูลสุกร / แม่พันธุ์</h2>
+      <form id="livestockForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">หมายเลขเบอร์หู</label>
+          <input type="text" name="earTag" required placeholder="เช่น TH-0231" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">สายพันธุ์</label>
+          <input type="text" name="breed" required placeholder="เช่น ลาร์จไวท์" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-slate-400 mb-1">ประวัติการประสม/สุขภาพ</label>
+          <textarea name="history" rows="2" placeholder="เช่น ผสมเทียมวันที่..., ฉีดวัคซีนวันที่..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-slate-400 mb-1">รูปถ่าย</label>
+          <input type="file" name="photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:text-sm file:font-medium">
+        </div>
+        <div class="sm:col-span-2 flex justify-end">
+          <button type="submit" class="submit-btn bg-brand-600 hover:bg-brand-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition">
+            <span class="btn-label">บันทึกข้อมูลสุกร</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <h2 class="font-bold text-white mb-3 px-1">การ์ดข้อมูลสุกรทั้งหมด</h2>
+      <div id="livestockGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Image modal -->
+<div id="imageModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) closeImageModal()">
+  <div class="max-w-3xl w-full">
+    <img id="modalImage" src="" class="w-full max-h-[85vh] object-contain rounded-xl">
+    <button onclick="closeImageModal()" class="mt-3 mx-auto block text-slate-300 hover:text-white text-sm">ปิด ✕</button>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center w-full px-4"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
