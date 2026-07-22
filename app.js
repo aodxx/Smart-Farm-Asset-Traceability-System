@@ -12,7 +12,7 @@ const CONFIG = {
 
   // ImageKit.io credentials (Dashboard > Developer Options)
   IMAGEKIT_PUBLIC_KEY: "public_T0vciCPlw",
-  IMAGEKIT_URL_ENDPOINT: "https://ik.imagekit.io/niphonfarm](https://ik.imagekit.io/niphonfarm",
+  IMAGEKIT_URL_ENDPOINT: "https://ik.imagekit.io/niphonfarm",
 
   // Endpoint ที่คืนค่า signature/token/expire สำหรับ ImageKit authentication
   // ใช้ Web App URL เดียวกันกับ API_URL แค่เติม ?action=imagekitAuth (ดู Code.gs)
