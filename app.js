@@ -8,7 +8,7 @@
 
 const CONFIG = {
   // URL ของ Google Apps Script Web App (จาก Deploy > New deployment)
-  API_URL: "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbyHwX6e4ZsPQUBvp1-iwOkxK6Dy_tlx8bUyWoS6faTlLhb8jSIXmyPfQQ4bCtYfekQ2ng/exec",
 
   // ImageKit.io credentials (Dashboard > Developer Options)
   IMAGEKIT_PUBLIC_KEY: "public_YOUR_IMAGEKIT_PUBLIC_KEY",
