@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const core = require("../core.js");
 
 test("escapeHtml escapes markup and quotes", () => {
@@ -65,4 +66,38 @@ test("validateFile rejects non-images and large images", () => {
     core.validateFile({ size: 1024, type: "image/jpeg" }).valid,
     true
   );
+});
+
+test("normalizeImageKitAuth accepts SDK v4 authentication fields", () => {
+  assert.deepEqual(
+    core.normalizeImageKitAuth({
+      token: "upload-token",
+      signature: "A".repeat(40),
+      expire: "1785400000",
+    }),
+    {
+      valid: true,
+      token: "upload-token",
+      signature: "a".repeat(40),
+      expire: 1785400000,
+    }
+  );
+
+  assert.equal(
+    core.normalizeImageKitAuth({
+      token: "",
+      signature: "invalid",
+      expire: 0,
+    }).valid,
+    false
+  );
+});
+
+test("frontend passes ImageKit SDK v4 authentication fields to upload", () => {
+  const source = fs.readFileSync("app.js", "utf8");
+
+  assert.doesNotMatch(source, /authenticationEndpoint\s*:/);
+  assert.match(source, /token:\s*authentication\.token/);
+  assert.match(source, /signature:\s*authentication\.signature/);
+  assert.match(source, /expire:\s*authentication\.expire/);
 });
