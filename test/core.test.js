@@ -101,3 +101,32 @@ test("frontend passes ImageKit SDK v4 authentication fields to upload", () => {
   assert.match(source, /signature:\s*authentication\.signature/);
   assert.match(source, /expire:\s*authentication\.expire/);
 });
+
+test("connectionStatusForError distinguishes auth, network, and partial failures", () => {
+  assert.deepEqual(core.connectionStatusForError("UNAUTHORIZED"), {
+    status: "unauthorized",
+    text: "Token ไม่ถูกต้อง",
+  });
+  assert.deepEqual(core.connectionStatusForError("TIMEOUT"), {
+    status: "offline",
+    text: "เชื่อมต่อไม่ได้",
+  });
+  assert.deepEqual(core.connectionStatusForError("IMAGEKIT_ERROR"), {
+    status: "degraded",
+    text: "ระบบขัดข้องบางส่วน",
+  });
+});
+
+test("successful mutations and sheet loads restore the online indicator", () => {
+  const source = fs.readFileSync("app.js", "utf8");
+
+  assert.match(
+    source,
+    /async function apiMutation[\s\S]*?setConnectionStatus\("online", "เชื่อมต่อแล้ว"\)[\s\S]*?return result;/
+  );
+  assert.match(
+    source,
+    /async function loadSheet[\s\S]*?setConnectionStatus\("online", "เชื่อมต่อแล้ว"\)[\s\S]*?\n}/
+  );
+  assert.match(source, /generation !== state\.loadGeneration/);
+});
