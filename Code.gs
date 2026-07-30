@@ -1,167 +1,565 @@
 /**
- * =====================================================================
- * Smart Farm Asset & Traceability System — Code.gs
- * นิพนธ์ ฟาร์ม
- * =====================================================================
- * วิธีติดตั้ง:
- * 1. เปิด Google Sheets ไฟล์ใหม่ (นี่คือ "Database" ของระบบ)
- * 2. เมนู Extensions > Apps Script แล้ววางโค้ดนี้ทับไฟล์ Code.gs เดิม
- * 3. กด Deploy > New deployment > เลือกประเภท "Web app"
- *    - Execute as: Me
- *    - Who has access: Anyone
- * 4. คัดลอก Web App URL ไปวางที่ CONFIG.API_URL ในไฟล์ app.js
+ * Smart Farm Asset & Traceability API
+ * Google Apps Script + Google Sheets
  *
- * Sheet ที่ระบบจะสร้างอัตโนมัติหากยังไม่มี: Expenses, Assets, Livestock
- * =====================================================================
+ * Script Properties:
+ * - IMAGEKIT_PRIVATE_KEY (required for image uploads)
+ * - APP_ACCESS_TOKEN     (recommended; protects reads and writes)
+ * - SPREADSHEET_ID       (optional for standalone scripts)
  */
 
-// ชื่อ Sheet และหัวคอลัมน์ (Header) มาตรฐานของแต่ละโมดูล
+const APP_VERSION = "1.0.0";
 const SHEET_SCHEMAS = {
-  Expenses: ["timestamp", "date", "category", "amount", "description", "photoUrl"],
-  Assets: ["timestamp", "assetName", "acquiredDate", "condition", "note", "photoUrl"],
-  Livestock: ["timestamp", "earTag", "breed", "history", "photoUrl"],
+  Expenses: [
+    "id",
+    "timestamp",
+    "updatedAt",
+    "deletedAt",
+    "date",
+    "category",
+    "amount",
+    "description",
+    "photoUrl",
+  ],
+  Assets: [
+    "id",
+    "timestamp",
+    "updatedAt",
+    "deletedAt",
+    "assetName",
+    "acquiredDate",
+    "condition",
+    "note",
+    "photoUrl",
+  ],
+  Livestock: [
+    "id",
+    "timestamp",
+    "updatedAt",
+    "deletedAt",
+    "earTag",
+    "breed",
+    "history",
+    "photoUrl",
+  ],
 };
 
-/* ---------------------------------------------------------------------
- * doGet — อ่านข้อมูลจาก Sheet ที่กำหนด แล้วส่งกลับเป็น JSON
- * ตัวอย่างเรียกใช้: {API_URL}?sheet=Expenses
- * ------------------------------------------------------------------- */
+const WRITABLE_FIELDS = {
+  Expenses: ["date", "category", "amount", "description", "photoUrl"],
+  Assets: ["assetName", "acquiredDate", "condition", "note", "photoUrl"],
+  Livestock: ["earTag", "breed", "history", "photoUrl"],
+};
+
 function doGet(e) {
   try {
-    const action = e.parameter && e.parameter.action;
+    const params = (e && e.parameter) || {};
+    const action = params.action || "list";
 
-    // Endpoint พิเศษสำหรับ ImageKit client-side upload authentication
-    // เรียกใช้ผ่าน: {API_URL}?action=imagekitAuth
+    if (action === "health") {
+      return jsonResponse(getHealth());
+    }
+
+    assertAuthorized(params.token);
+
     if (action === "imagekitAuth") {
+      // ImageKit JavaScript SDK requires these fields at the response root.
       return jsonResponse(getImageKitAuthParams());
     }
 
-    const sheetName = (e.parameter && e.parameter.sheet) || "Expenses";
-    const sheet = getOrCreateSheet(sheetName);
-    const data = readSheetAsObjects(sheet);
-    return jsonResponse({ status: "success", sheet: sheetName, data: data });
+    if (action !== "list") {
+      throw apiError("UNSUPPORTED_ACTION", "ไม่รองรับ action: " + action);
+    }
+
+    const sheetName = assertSheetName(params.sheet || "Expenses");
+    const rows = listRecords(sheetName, {
+      includeDeleted: params.includeDeleted === "true",
+      query: params.query || "",
+    });
+
+    return jsonResponse({
+      status: "success",
+      version: APP_VERSION,
+      sheet: sheetName,
+      data: rows,
+    });
   } catch (err) {
-    return jsonResponse({ status: "error", message: err.message });
+    return errorResponse(err);
   }
 }
 
-/* ---------------------------------------------------------------------
- * ImageKit Authentication — สร้าง token/signature/expire สำหรับ
- * Client-side Upload ตาม ImageKit Server-side Auth spec
- *
- * ต้องตั้งค่า Script Property ชื่อ IMAGEKIT_PRIVATE_KEY ก่อนใช้งาน:
- * เมนู Project Settings (⚙️) > Script Properties > Add script property
- *   Key: IMAGEKIT_PRIVATE_KEY   Value: private_xxxxxxxxxxxx (จาก ImageKit Dashboard)
- * ------------------------------------------------------------------- */
+function doPost(e) {
+  let lock;
+  try {
+    const payload = parsePayload(e);
+    assertAuthorized(payload.token);
+
+    const action = payload.action || "create";
+    const sheetName = assertSheetName(payload.sheet);
+    lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+
+    let result;
+    if (action === "create") {
+      result = createRecord(sheetName, payload.record || {});
+    } else if (action === "update") {
+      result = updateRecord(sheetName, payload.id, payload.record || {});
+    } else if (action === "delete") {
+      result = archiveRecord(sheetName, payload.id);
+    } else if (action === "restore") {
+      result = restoreRecord(sheetName, payload.id);
+    } else {
+      throw apiError("UNSUPPORTED_ACTION", "ไม่รองรับ action: " + action);
+    }
+
+    return jsonResponse({
+      status: "success",
+      version: APP_VERSION,
+      action: action,
+      sheet: sheetName,
+      data: result,
+    });
+  } catch (err) {
+    return errorResponse(err);
+  } finally {
+    if (lock && lock.hasLock()) lock.releaseLock();
+  }
+}
+
+/**
+ * Run once from the Apps Script editor after pasting this file.
+ * It creates/migrates all sheets and returns a setup summary.
+ */
+function setupSystem() {
+  const result = {};
+  Object.keys(SHEET_SCHEMAS).forEach(function (sheetName) {
+    const sheet = getOrCreateSheet(sheetName);
+    result[sheetName] = Math.max(0, sheet.getLastRow() - 1);
+  });
+  return {
+    status: "success",
+    version: APP_VERSION,
+    timezone: Session.getScriptTimeZone(),
+    rows: result,
+  };
+}
+
+function getHealth() {
+  const properties = PropertiesService.getScriptProperties();
+  const accessToken = properties.getProperty("APP_ACCESS_TOKEN");
+  const imageKitKey = properties.getProperty("IMAGEKIT_PRIVATE_KEY");
+  const counts = {};
+
+  Object.keys(SHEET_SCHEMAS).forEach(function (sheetName) {
+    counts[sheetName] = listRecords(sheetName).length;
+  });
+
+  return {
+    status: "success",
+    version: APP_VERSION,
+    service: "Smart Farm Asset & Traceability API",
+    timestamp: new Date().toISOString(),
+    secureMode: Boolean(accessToken),
+    imageUploadConfigured: Boolean(imageKitKey),
+    counts: counts,
+  };
+}
+
 function getImageKitAuthParams() {
-  const privateKey = PropertiesService.getScriptProperties().getProperty("IMAGEKIT_PRIVATE_KEY");
+  const privateKey = PropertiesService.getScriptProperties().getProperty(
+    "IMAGEKIT_PRIVATE_KEY"
+  );
   if (!privateKey) {
-    throw new Error("ยังไม่ได้ตั้งค่า IMAGEKIT_PRIVATE_KEY ใน Script Properties");
+    throw apiError(
+      "IMAGEKIT_NOT_CONFIGURED",
+      "ยังไม่ได้ตั้งค่า IMAGEKIT_PRIVATE_KEY ใน Script Properties"
+    );
   }
 
   const token = Utilities.getUuid();
-  const expire = Math.floor(Date.now() / 1000) + 60 * 10; // หมดอายุใน 10 นาที
-  const signatureString = token + expire;
+  const expire = Math.floor(Date.now() / 1000) + 10 * 60;
+  const signatureBytes = Utilities.computeHmacSignature(
+    Utilities.MacAlgorithm.HMAC_SHA_1,
+    token + expire,
+    privateKey
+  );
 
-  const signatureBytes = Utilities.computeHmacSha1Signature(signatureString, privateKey);
-  const signature = signatureBytes
-    .map((byte) => {
-      const v = (byte < 0 ? byte + 256 : byte).toString(16);
-      return v.length === 1 ? "0" + v : v;
-    })
-    .join("");
-
-  return { token: token, expire: expire, signature: signature };
+  return {
+    token: token,
+    expire: expire,
+    signature: bytesToHex(signatureBytes),
+  };
 }
 
-/* ---------------------------------------------------------------------
- * doPost — รับ JSON payload แล้ว appendRow ลง Sheet ที่กำหนด
- * Body ที่คาดหวัง: { "sheet": "Expenses", "record": { ...fields } }
- *
- * หมายเหตุ: Frontend ส่งด้วย Content-Type: text/plain เพื่อเลี่ยง
- * CORS preflight (OPTIONS) ซึ่ง Apps Script Web App ไม่รองรับโดยตรง
- * ------------------------------------------------------------------- */
-function doPost(e) {
-  try {
-    const payload = JSON.parse(e.postData.contents);
-    const sheetName = payload.sheet;
-    const record = payload.record || {};
+function listRecords(sheetName, options) {
+  const opts = options || {};
+  const rows = readSheetAsObjects(getOrCreateSheet(sheetName));
+  const query = cleanText(opts.query).toLowerCase();
 
-    if (!sheetName || !SHEET_SCHEMAS[sheetName]) {
-      throw new Error("ไม่พบ sheet ที่ระบุ: " + sheetName);
-    }
-
-    const sheet = getOrCreateSheet(sheetName);
-    const headers = SHEET_SCHEMAS[sheetName];
-
-    const row = headers.map((col) => {
-      if (col === "timestamp") return new Date();
-      return record[col] !== undefined ? record[col] : "";
+  return rows.filter(function (row) {
+    if (!opts.includeDeleted && row.deletedAt) return false;
+    if (!query) return true;
+    return Object.keys(row).some(function (key) {
+      return String(row[key] || "")
+        .toLowerCase()
+        .includes(query);
     });
-
-    sheet.appendRow(row);
-
-    return jsonResponse({ status: "success", message: "บันทึกข้อมูลสำเร็จ", sheet: sheetName });
-  } catch (err) {
-    return jsonResponse({ status: "error", message: err.message });
-  }
-}
-
-/* ---------------------------------------------------------------------
- * Helper: ดึง Sheet ตามชื่อ ถ้ายังไม่มีให้สร้างใหม่พร้อม Header
- * ------------------------------------------------------------------- */
-function getOrCreateSheet(sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(sheetName);
-
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-  }
-
-  const headers = SHEET_SCHEMAS[sheetName] || SHEET_SCHEMAS.Expenses;
-
-  // Auto-create header row หากแถวแรกยังว่างอยู่
-  const firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  const hasHeader = firstRow.some((cell) => cell !== "");
-  if (!hasHeader) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
-  }
-
-  return sheet;
-}
-
-/* ---------------------------------------------------------------------
- * Helper: อ่านข้อมูลทั้ง Sheet แล้วแปลงเป็น Array ของ Object
- * โดยใช้แถวแรก (header) เป็นชื่อ key
- * ------------------------------------------------------------------- */
-function readSheetAsObjects(sheet) {
-  const lastRow = sheet.getLastRow();
-  const lastCol = sheet.getLastColumn();
-  if (lastRow < 2) return [];
-
-  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
-
-  return values.map((row) => {
-    const obj = {};
-    headers.forEach((header, i) => {
-      let val = row[i];
-      // แปลง Date object เป็น string รูปแบบอ่านง่าย
-      if (val instanceof Date) {
-        val = Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-      }
-      obj[header] = val;
-    });
-    return obj;
   });
 }
 
-/* ---------------------------------------------------------------------
- * Helper: สร้าง JSON response (ContentService จะแนบ
- * Access-Control-Allow-Origin: * ให้อัตโนมัติสำหรับ simple request)
- * ------------------------------------------------------------------- */
+function createRecord(sheetName, input) {
+  const sheet = getOrCreateSheet(sheetName);
+  const record = sanitizeRecord(sheetName, input);
+  validateRecord(sheetName, record);
+  assertNoDuplicate(sheetName, record);
+
+  const now = new Date();
+  const fullRecord = Object.assign({}, record, {
+    id: Utilities.getUuid(),
+    timestamp: now,
+    updatedAt: now,
+    deletedAt: "",
+  });
+
+  appendObjectRow(sheet, fullRecord);
+  return serializeObject(fullRecord);
+}
+
+function updateRecord(sheetName, id, input) {
+  const sheet = getOrCreateSheet(sheetName);
+  const rowNumber = findRowById(sheet, id);
+  const current = readRowAsObject(sheet, rowNumber);
+  const changes = sanitizeRecord(sheetName, input);
+  const next = Object.assign({}, current, changes, {
+    id: current.id,
+    timestamp: current.timestamp,
+    updatedAt: new Date(),
+  });
+
+  validateRecord(sheetName, next);
+  assertNoDuplicate(sheetName, next, id);
+  writeObjectToRow(sheet, rowNumber, next);
+  return serializeObject(next);
+}
+
+function archiveRecord(sheetName, id) {
+  const sheet = getOrCreateSheet(sheetName);
+  const rowNumber = findRowById(sheet, id);
+  const record = readRowAsObject(sheet, rowNumber);
+  record.deletedAt = new Date();
+  record.updatedAt = new Date();
+  writeObjectToRow(sheet, rowNumber, record);
+  return serializeObject(record);
+}
+
+function restoreRecord(sheetName, id) {
+  const sheet = getOrCreateSheet(sheetName);
+  const rowNumber = findRowById(sheet, id);
+  const record = readRowAsObject(sheet, rowNumber);
+  record.deletedAt = "";
+  record.updatedAt = new Date();
+  validateRecord(sheetName, record);
+  assertNoDuplicate(sheetName, record, id);
+  writeObjectToRow(sheet, rowNumber, record);
+  return serializeObject(record);
+}
+
+function validateRecord(sheetName, record) {
+  if (sheetName === "Expenses") {
+    if (!isIsoDate(record.date)) {
+      throw apiError("VALIDATION_ERROR", "กรุณาระบุวันที่รายจ่ายให้ถูกต้อง");
+    }
+    if (!cleanText(record.category)) {
+      throw apiError("VALIDATION_ERROR", "กรุณาระบุหมวดหมู่รายจ่าย");
+    }
+    if (!Number.isFinite(Number(record.amount)) || Number(record.amount) <= 0) {
+      throw apiError("VALIDATION_ERROR", "จำนวนเงินต้องมากกว่า 0");
+    }
+  }
+
+  if (sheetName === "Assets") {
+    if (!cleanText(record.assetName)) {
+      throw apiError("VALIDATION_ERROR", "กรุณาระบุชื่อสินทรัพย์");
+    }
+    if (!isIsoDate(record.acquiredDate)) {
+      throw apiError("VALIDATION_ERROR", "กรุณาระบุวันที่รับเข้าให้ถูกต้อง");
+    }
+    if (
+      ["ดี", "พอใช้", "ต้องซ่อม", "ปลดระวาง"].indexOf(record.condition) === -1
+    ) {
+      throw apiError("VALIDATION_ERROR", "สภาพสินทรัพย์ไม่ถูกต้อง");
+    }
+  }
+
+  if (sheetName === "Livestock") {
+    if (!cleanText(record.earTag)) {
+      throw apiError("VALIDATION_ERROR", "กรุณาระบุหมายเลขเบอร์หู");
+    }
+    if (!cleanText(record.breed)) {
+      throw apiError("VALIDATION_ERROR", "กรุณาระบุสายพันธุ์");
+    }
+  }
+}
+
+function assertNoDuplicate(sheetName, record, excludeId) {
+  if (sheetName !== "Livestock") return;
+
+  const earTag = cleanText(record.earTag).toLowerCase();
+  const duplicate = listRecords(sheetName).some(function (row) {
+    return (
+      row.id !== excludeId &&
+      cleanText(row.earTag).toLowerCase() === earTag
+    );
+  });
+
+  if (duplicate) {
+    throw apiError(
+      "DUPLICATE_EAR_TAG",
+      "มีหมายเลขเบอร์หูนี้อยู่ในระบบแล้ว: " + record.earTag
+    );
+  }
+}
+
+function sanitizeRecord(sheetName, input) {
+  const fields = WRITABLE_FIELDS[sheetName];
+  const result = {};
+  fields.forEach(function (field) {
+    if (input[field] === undefined) return;
+    result[field] =
+      field === "amount" ? Number(input[field]) : cleanText(input[field]);
+  });
+  return result;
+}
+
+function getOrCreateSheet(sheetName) {
+  const ss = getSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
+
+  ensureSchema(sheet, SHEET_SCHEMAS[sheetName]);
+  ensureRowMetadata(sheet);
+  return sheet;
+}
+
+function getSpreadsheet() {
+  const configuredId = PropertiesService.getScriptProperties().getProperty(
+    "SPREADSHEET_ID"
+  );
+  if (configuredId) return SpreadsheetApp.openById(configuredId);
+
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (!active) {
+    throw apiError(
+      "SPREADSHEET_NOT_CONFIGURED",
+      "ไม่พบ Google Sheet ที่ผูกกับสคริปต์ กรุณาตั้งค่า SPREADSHEET_ID"
+    );
+  }
+  return active;
+}
+
+function ensureSchema(sheet, expectedHeaders) {
+  if (sheet.getLastRow() === 0) {
+    sheet
+      .getRange(1, 1, 1, expectedHeaders.length)
+      .setValues([expectedHeaders]);
+  } else {
+    const width = Math.max(1, sheet.getLastColumn());
+    const current = sheet.getRange(1, 1, 1, width).getValues()[0];
+    const missing = expectedHeaders.filter(function (header) {
+      return current.indexOf(header) === -1;
+    });
+    if (missing.length) {
+      sheet
+        .getRange(1, width + 1, 1, missing.length)
+        .setValues([missing]);
+    }
+  }
+
+  sheet.setFrozenRows(1);
+  sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .setFontWeight("bold")
+    .setBackground("#1c3b82")
+    .setFontColor("#ffffff");
+}
+
+function ensureRowMetadata(sheet) {
+  if (sheet.getLastRow() < 2) return;
+
+  const headers = getHeaders(sheet);
+  const idIndex = headers.indexOf("id");
+  const timestampIndex = headers.indexOf("timestamp");
+  const updatedAtIndex = headers.indexOf("updatedAt");
+  const range = sheet.getRange(
+    2,
+    1,
+    sheet.getLastRow() - 1,
+    headers.length
+  );
+  const values = range.getValues();
+  let changed = false;
+
+  values.forEach(function (row) {
+    if (!row[idIndex]) {
+      row[idIndex] = Utilities.getUuid();
+      changed = true;
+    }
+    if (!row[updatedAtIndex]) {
+      row[updatedAtIndex] = row[timestampIndex] || new Date();
+      changed = true;
+    }
+  });
+
+  if (changed) range.setValues(values);
+}
+
+function appendObjectRow(sheet, record) {
+  const headers = getHeaders(sheet);
+  sheet.appendRow(
+    headers.map(function (header) {
+      return record[header] !== undefined ? record[header] : "";
+    })
+  );
+}
+
+function writeObjectToRow(sheet, rowNumber, record) {
+  const headers = getHeaders(sheet);
+  const values = headers.map(function (header) {
+    return record[header] !== undefined ? record[header] : "";
+  });
+  sheet.getRange(rowNumber, 1, 1, headers.length).setValues([values]);
+}
+
+function readSheetAsObjects(sheet) {
+  if (sheet.getLastRow() < 2) return [];
+  const headers = getHeaders(sheet);
+  return sheet
+    .getRange(2, 1, sheet.getLastRow() - 1, headers.length)
+    .getValues()
+    .map(function (row) {
+      return rowToObject(headers, row);
+    });
+}
+
+function readRowAsObject(sheet, rowNumber) {
+  const headers = getHeaders(sheet);
+  const row = sheet.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
+  return rowToObject(headers, row, false);
+}
+
+function rowToObject(headers, row, serialize) {
+  const obj = {};
+  headers.forEach(function (header, index) {
+    obj[header] = row[index];
+  });
+  return serialize === false ? obj : serializeObject(obj);
+}
+
+function serializeObject(obj) {
+  const result = {};
+  Object.keys(obj).forEach(function (key) {
+    const value = obj[key];
+    result[key] =
+      value instanceof Date
+        ? Utilities.formatDate(
+            value,
+            Session.getScriptTimeZone(),
+            "yyyy-MM-dd'T'HH:mm:ssXXX"
+          )
+        : value;
+  });
+  return result;
+}
+
+function findRowById(sheet, id) {
+  const cleanId = cleanText(id);
+  if (!cleanId) throw apiError("MISSING_ID", "ไม่พบรหัสรายการ");
+  if (sheet.getLastRow() < 2) {
+    throw apiError("NOT_FOUND", "ไม่พบรายการที่ต้องการ");
+  }
+
+  const headers = getHeaders(sheet);
+  const idColumn = headers.indexOf("id") + 1;
+  const values = sheet
+    .getRange(2, idColumn, sheet.getLastRow() - 1, 1)
+    .getValues();
+
+  for (let index = 0; index < values.length; index += 1) {
+    if (String(values[index][0]) === cleanId) return index + 2;
+  }
+  throw apiError("NOT_FOUND", "ไม่พบรายการที่ต้องการ");
+}
+
+function getHeaders(sheet) {
+  return sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map(String);
+}
+
+function parsePayload(e) {
+  if (!e || !e.postData || !e.postData.contents) {
+    throw apiError("INVALID_REQUEST", "ไม่พบข้อมูลที่ส่งมา");
+  }
+  try {
+    return JSON.parse(e.postData.contents);
+  } catch (err) {
+    throw apiError("INVALID_JSON", "รูปแบบ JSON ไม่ถูกต้อง");
+  }
+}
+
+function assertSheetName(sheetName) {
+  if (!sheetName || !SHEET_SCHEMAS[sheetName]) {
+    throw apiError("INVALID_SHEET", "ไม่พบ sheet ที่ระบุ: " + sheetName);
+  }
+  return sheetName;
+}
+
+function assertAuthorized(providedToken) {
+  const expected = PropertiesService.getScriptProperties().getProperty(
+    "APP_ACCESS_TOKEN"
+  );
+  if (expected && String(providedToken || "") !== expected) {
+    throw apiError(
+      "UNAUTHORIZED",
+      "Access Token ไม่ถูกต้อง กรุณาตั้งค่าการเชื่อมต่อ"
+    );
+  }
+}
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+}
+
+function cleanText(value) {
+  return String(value === undefined || value === null ? "" : value).trim();
+}
+
+function bytesToHex(bytes) {
+  return bytes
+    .map(function (byte) {
+      const value = (byte < 0 ? byte + 256 : byte).toString(16);
+      return value.length === 1 ? "0" + value : value;
+    })
+    .join("");
+}
+
+function apiError(code, message) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+function errorResponse(err) {
+  return jsonResponse({
+    status: "error",
+    error: {
+      code: err.code || "INTERNAL_ERROR",
+      message: err.message || "เกิดข้อผิดพลาดภายในระบบ",
+    },
+    message: err.message || "เกิดข้อผิดพลาดภายในระบบ",
+  });
+}
+
 function jsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
     ContentService.MimeType.JSON

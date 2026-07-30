@@ -1,0 +1,19 @@
+{
+  "name": "นิพนธ์ ฟาร์ม — Smart Farm",
+  "short_name": "นิพนธ์ ฟาร์ม",
+  "description": "ระบบจัดการรายจ่าย สินทรัพย์ และทะเบียนสุกร",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0a0f1a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

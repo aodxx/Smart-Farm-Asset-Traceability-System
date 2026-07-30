@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="description" content="ระบบจัดการรายจ่าย สินทรัพย์ และทะเบียนสุกรของนิพนธ์ ฟาร์ม">
+<meta name="theme-color" content="#0a0f1a">
 <title>นิพนธ์ ฟาร์ม | Smart Farm Asset & Traceability System</title>
+<link rel="manifest" href="manifest.webmanifest">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/imagekit-javascript@latest/dist/imagekit.min.js"></script>
+<script defer src="https://unpkg.com/imagekit-javascript@4.0.1/dist/imagekit.min.js"></script>
 <script>
   tailwind.config = {
     theme: {
@@ -67,9 +70,13 @@
         <p class="text-[11px] text-slate-400 leading-tight">Smart Farm Asset & Traceability</p>
       </div>
     </div>
-    <button id="refreshBtn" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" title="รีเฟรชข้อมูล">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-    </button>
+    <div class="flex items-center gap-1">
+      <span id="connectionStatus" class="hidden sm:inline-flex text-[11px] px-2 py-1 rounded-full bg-slate-800 text-slate-400">กำลังเชื่อมต่อ</span>
+      <button id="settingsBtn" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" title="ตั้งค่าการเชื่อมต่อ" aria-label="ตั้งค่าการเชื่อมต่อ">⚙️</button>
+      <button id="refreshBtn" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" title="รีเฟรชข้อมูล" aria-label="รีเฟรชข้อมูล">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+      </button>
+    </div>
   </div>
 
   <!-- Tabs -->
@@ -81,6 +88,38 @@
 </header>
 
 <main class="max-w-5xl mx-auto px-4 mt-5 space-y-6">
+
+  <section aria-labelledby="overviewTitle">
+    <div class="flex items-end justify-between mb-3 px-1">
+      <div>
+        <p class="text-xs text-brand-400 font-semibold">ภาพรวมฟาร์ม</p>
+        <h2 id="overviewTitle" class="text-lg font-bold text-white">ข้อมูลสำคัญล่าสุด</h2>
+      </div>
+      <span id="lastUpdated" class="text-[11px] text-slate-500"></span>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <article class="bg-gradient-to-br from-brand-700 to-brand-900 border border-brand-500/30 rounded-2xl p-4">
+        <p class="text-xs text-brand-100">รายจ่ายสะสม</p>
+        <p id="summaryExpense" class="text-xl font-extrabold text-white mt-1">0.00 ฿</p>
+        <p id="summaryExpenseCount" class="text-[11px] text-brand-100/70 mt-1">0 รายการ</p>
+      </article>
+      <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <p class="text-xs text-slate-400">สินทรัพย์</p>
+        <p id="summaryAssets" class="text-xl font-extrabold text-white mt-1">0</p>
+        <p id="summaryRepair" class="text-[11px] text-amber-400 mt-1">รอซ่อม 0 รายการ</p>
+      </article>
+      <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <p class="text-xs text-slate-400">สุกรในทะเบียน</p>
+        <p id="summaryLivestock" class="text-xl font-extrabold text-white mt-1">0</p>
+        <p class="text-[11px] text-slate-500 mt-1">เบอร์หูไม่ซ้ำกัน</p>
+      </article>
+      <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <p class="text-xs text-slate-400">สถานะระบบ</p>
+        <p id="summarySystem" class="text-sm font-bold text-amber-400 mt-2">กำลังตรวจสอบ</p>
+        <p id="summaryVersion" class="text-[11px] text-slate-500 mt-1">API —</p>
+      </article>
+    </div>
+  </section>
 
   <!-- ============ MODULE 1: EXPENSES ============ -->
   <section id="panel-expenses" class="tab-panel space-y-5">
@@ -114,7 +153,8 @@
           <label class="block text-xs font-medium text-slate-400 mb-1">รายละเอียด</label>
           <textarea name="description" rows="2" placeholder="รายละเอียดเพิ่มเติม..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
         </div>
-        <div class="sm:col-span-2 flex justify-end">
+        <div class="sm:col-span-2 flex justify-end gap-2">
+          <button type="button" class="cancel-edit hidden bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition">ยกเลิกแก้ไข</button>
           <button type="submit" class="submit-btn bg-brand-600 hover:bg-brand-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition">
             <span class="btn-label">บันทึกรายจ่าย</span>
           </button>
@@ -127,6 +167,10 @@
         <h2 class="font-bold text-white">รายการล่าสุด</h2>
         <span id="expenseTotal" class="text-xs text-slate-400"></span>
       </div>
+      <label class="block mb-3">
+        <span class="sr-only">ค้นหารายจ่าย</span>
+        <input id="expenseSearch" type="search" placeholder="ค้นหาหมวดหมู่ วันที่ หรือรายละเอียด..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+      </label>
       <div id="expenseList" class="space-y-2"></div>
     </div>
   </section>
@@ -161,7 +205,8 @@
           <label class="block text-xs font-medium text-slate-400 mb-1">หมายเหตุ</label>
           <textarea name="note" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
         </div>
-        <div class="sm:col-span-2 flex justify-end">
+        <div class="sm:col-span-2 flex justify-end gap-2">
+          <button type="button" class="cancel-edit hidden bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition">ยกเลิกแก้ไข</button>
           <button type="submit" class="submit-btn bg-brand-600 hover:bg-brand-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition">
             <span class="btn-label">เพิ่มสินทรัพย์</span>
           </button>
@@ -170,7 +215,19 @@
     </div>
 
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 overflow-x-auto">
-      <h2 class="font-bold text-white mb-3">ตารางสินทรัพย์ทั้งหมด</h2>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+        <h2 class="font-bold text-white">ตารางสินทรัพย์ทั้งหมด</h2>
+        <div class="flex gap-2">
+          <input id="assetSearch" type="search" placeholder="ค้นหาสินทรัพย์..." class="min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+          <select id="assetConditionFilter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+            <option value="">ทุกสภาพ</option>
+            <option value="ดี">ดี</option>
+            <option value="พอใช้">พอใช้</option>
+            <option value="ต้องซ่อม">ต้องซ่อม</option>
+            <option value="ปลดระวาง">ปลดระวาง</option>
+          </select>
+        </div>
+      </div>
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-slate-400 border-b border-slate-800">
@@ -178,6 +235,7 @@
             <th class="py-2 pr-3 font-medium">ชื่อ</th>
             <th class="py-2 pr-3 font-medium">วันที่รับเข้า</th>
             <th class="py-2 pr-3 font-medium">สภาพ</th>
+            <th class="py-2 text-right font-medium">จัดการ</th>
           </tr>
         </thead>
         <tbody id="assetTableBody" class="divide-y divide-slate-800"></tbody>
@@ -206,7 +264,8 @@
           <label class="block text-xs font-medium text-slate-400 mb-1">รูปถ่าย</label>
           <input type="file" name="photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:text-sm file:font-medium">
         </div>
-        <div class="sm:col-span-2 flex justify-end">
+        <div class="sm:col-span-2 flex justify-end gap-2">
+          <button type="button" class="cancel-edit hidden bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition">ยกเลิกแก้ไข</button>
           <button type="submit" class="submit-btn bg-brand-600 hover:bg-brand-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition">
             <span class="btn-label">บันทึกข้อมูลสุกร</span>
           </button>
@@ -215,12 +274,42 @@
     </div>
 
     <div>
-      <h2 class="font-bold text-white mb-3 px-1">การ์ดข้อมูลสุกรทั้งหมด</h2>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 px-1">
+        <h2 class="font-bold text-white">การ์ดข้อมูลสุกรทั้งหมด</h2>
+        <input id="livestockSearch" type="search" placeholder="ค้นหาเบอร์หูหรือสายพันธุ์..." class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+      </div>
       <div id="livestockGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </div>
   </section>
 
 </main>
+
+<!-- Connection settings modal -->
+<div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl p-5 shadow-2xl">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h2 id="settingsTitle" class="text-lg font-bold text-white">ตั้งค่าการเชื่อมต่อ</h2>
+        <p class="text-xs text-slate-400 mt-1">กรอก Access Token ที่ตั้งไว้ใน Apps Script เพียงครั้งเดียว ระบบจะเก็บไว้ในอุปกรณ์นี้</p>
+      </div>
+      <button id="closeSettingsBtn" type="button" class="text-slate-400 hover:text-white p-1" aria-label="ปิด">✕</button>
+    </div>
+    <form id="settingsForm" class="mt-5 space-y-4">
+      <div>
+        <label for="accessTokenInput" class="block text-xs font-medium text-slate-400 mb-1">Access Token</label>
+        <input id="accessTokenInput" type="password" autocomplete="off" placeholder="วาง APP_ACCESS_TOKEN" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm">
+      </div>
+      <label class="flex items-center gap-2 text-xs text-slate-400">
+        <input id="showTokenInput" type="checkbox" class="rounded border-slate-600 bg-slate-800">
+        แสดง Token
+      </label>
+      <div class="flex justify-end gap-2">
+        <button id="clearTokenBtn" type="button" class="px-4 py-2 rounded-lg text-sm text-rose-300 hover:bg-rose-500/10">ล้าง Token</button>
+        <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500">บันทึกและเชื่อมต่อ</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- Image modal -->
 <div id="imageModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) closeImageModal()">
@@ -231,8 +320,9 @@
 </div>
 
 <!-- Toast container -->
-<div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center w-full px-4"></div>
+<div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center w-full px-4" aria-live="polite"></div>
 
+<script src="core.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

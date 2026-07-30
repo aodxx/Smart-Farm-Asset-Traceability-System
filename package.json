@@ -1,0 +1,14 @@
+{
+  "name": "smart-farm-asset-traceability",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Farm Asset & Traceability System",
+  "scripts": {
+    "check": "node --check app.js && node --check core.js && cp Code.gs /tmp/smart-farm-code.js && node --check /tmp/smart-farm-code.js",
+    "test": "node --test test/core.test.js test/backend.test.js",
+    "test:smoke": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

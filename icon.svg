@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">นิพนธ์ ฟาร์ม</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3568d4"/>
+      <stop offset="1" stop-color="#122456"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M115 303c17-88 70-145 141-145s124 57 141 145c-45-20-94-30-141-30s-96 10-141 30Z" fill="#dbe7ff"/>
+  <path d="M132 326c38-17 81-26 124-26s86 9 124 26v52H132Z" fill="#5b8def"/>
+  <circle cx="214" cy="224" r="12" fill="#122456"/>
+  <circle cx="298" cy="224" r="12" fill="#122456"/>
+  <ellipse cx="256" cy="260" rx="34" ry="23" fill="#3568d4"/>
+  <circle cx="244" cy="260" r="5" fill="#122456"/>
+  <circle cx="268" cy="260" r="5" fill="#122456"/>
+  <text x="256" y="430" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="54" font-weight="800">นพ</text>
+</svg>
