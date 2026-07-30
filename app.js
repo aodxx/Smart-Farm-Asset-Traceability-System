@@ -5,8 +5,8 @@
 const CONFIG = {
   API_URL:
     "https://script.google.com/macros/s/AKfycbyHwX6e4ZsPQUBvp1-iwOkxK6Dy_tlx8bUyWoS6faTlLhb8jSIXmyPfQQ4bCtYfekQ2ng/exec",
-  IMAGEKIT_PUBLIC_KEY: "public_T0vciCPlw",
-  IMAGEKIT_URL_ENDPOINT: "https://ik.imagekit.io/niphonfarm",
+  IMAGEKIT_PUBLIC_KEY: "public_Or7oN0cYLa0ApQQhDxXqTx8huFQ=",
+  IMAGEKIT_URL_ENDPOINT: "https://ik.imagekit.io/ahrkj8bof",
   REQUEST_TIMEOUT_MS: 20000,
 };
 
