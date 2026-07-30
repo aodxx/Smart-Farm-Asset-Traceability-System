@@ -86,6 +86,25 @@
     return { valid: true };
   }
 
+  function normalizeImageKitAuth(value) {
+    const token = String(value?.token || "").trim();
+    const signature = String(value?.signature || "").trim().toLowerCase();
+    const expire = Number(value?.expire);
+    const valid =
+      Boolean(token) &&
+      /^[a-f0-9]{40}$/.test(signature) &&
+      Number.isInteger(expire) &&
+      expire > 0;
+
+    return valid
+      ? { valid: true, token, signature, expire }
+      : {
+          valid: false,
+          message:
+            "ข้อมูลยืนยัน ImageKit ไม่สมบูรณ์ กรุณาตรวจสอบ Apps Script Deployment",
+        };
+  }
+
   return {
     escapeHtml,
     safeImageUrl,
@@ -95,5 +114,6 @@
     filterRows,
     summarize,
     validateFile,
+    normalizeImageKitAuth,
   };
 });
