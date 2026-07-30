@@ -4,7 +4,7 @@
 
 ## สถานะ
 
-โค้ด v1.0 พร้อมสำหรับ deploy และทดสอบกับ Google Sheets จริง
+Backend v1.0 deploy แล้วและตั้งค่าความปลอดภัย/ImageKit แล้ว กำลังปิดบั๊กอัปโหลดรูปของ ImageKit JavaScript SDK v4
 
 ## เสร็จแล้ว
 
@@ -21,15 +21,20 @@
 - [x] เพิ่ม timeout และข้อความผิดพลาดของ API
 - [x] เพิ่ม PWA app shell
 - [x] เพิ่ม unit tests
+- [x] Deploy Apps Script API v1.0.0 และยืนยัน health endpoint
+- [x] ตั้ง `IMAGEKIT_PRIVATE_KEY` และ `APP_ACCESS_TOKEN`
+- [x] แก้ ImageKit SDK v4 ให้ส่ง `token`, `signature` และ `expire` ในคำสั่งอัปโหลด
+- [x] เพิ่ม validation สำหรับข้อมูลยืนยัน ImageKit
+- [x] เปลี่ยน PWA cache เป็น v2 เพื่อบังคับรับไฟล์แก้ไขล่าสุด
 
 ## ต้องทำตอน Deploy
 
-- [ ] นำ `Code.gs` เวอร์ชันล่าสุดไปวางใน Apps Script
-- [ ] ตั้ง Script Properties: `IMAGEKIT_PRIVATE_KEY` และ `APP_ACCESS_TOKEN`
+- [x] นำ `Code.gs` เวอร์ชันล่าสุดไปวางใน Apps Script
+- [x] ตั้ง Script Properties: `IMAGEKIT_PRIVATE_KEY` และ `APP_ACCESS_TOKEN`
 - [ ] ตั้ง Time zone เป็น `Asia/Bangkok`
 - [ ] Run `setupSystem`
-- [ ] สร้าง Web app deployment version ใหม่
-- [ ] ยืนยัน health endpoint เป็น API v1.0.0
+- [x] สร้าง Web app deployment version ใหม่
+- [x] ยืนยัน health endpoint เป็น API v1.0.0
 - [ ] ทดสอบเพิ่ม/แก้ไข/ลบข้อมูลอย่างละ 1 รายการ
 - [ ] ทดสอบอัปโหลดรูปจริงจากโทรศัพท์
 
