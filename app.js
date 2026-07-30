@@ -35,6 +35,7 @@ const {
   filterRows,
   summarize,
   validateFile,
+  normalizeImageKitAuth,
 } = FarmCore;
 
 const expenseForm = document.getElementById("expenseForm");
@@ -186,27 +187,37 @@ function getImageKitClient() {
   return new ImageKit({
     publicKey: CONFIG.IMAGEKIT_PUBLIC_KEY,
     urlEndpoint: CONFIG.IMAGEKIT_URL_ENDPOINT,
-    authenticationEndpoint: apiUrl({ action: "imagekitAuth" }),
   });
 }
 
-function uploadToImageKit(file, folder, currentUrl = "") {
+async function uploadToImageKit(file, folder, currentUrl = "") {
+  if (!file || !file.size) return currentUrl;
+
+  const validation = validateFile(file);
+  if (!validation.valid) throw new Error(validation.message);
+
+  const authentication = normalizeImageKitAuth(
+    await fetchJson(apiUrl({ action: "imagekitAuth" }))
+  );
+  if (!authentication.valid) {
+    throw new ApiError(authentication.message, "IMAGEKIT_AUTH_INVALID");
+  }
+
+  const fileName = `${Date.now()}_${file.name}`.replace(
+    /[^a-zA-Z0-9._-]+/g,
+    "_"
+  );
+
   return new Promise((resolve, reject) => {
-    if (!file || !file.size) return resolve(currentUrl);
-
-    const validation = validateFile(file);
-    if (!validation.valid) return reject(new Error(validation.message));
-
-    const fileName = `${Date.now()}_${file.name}`.replace(
-      /[^a-zA-Z0-9._-]+/g,
-      "_"
-    );
     getImageKitClient().upload(
       {
         file,
         fileName,
         folder: `/${folder}/`,
         useUniqueFileName: true,
+        token: authentication.token,
+        signature: authentication.signature,
+        expire: authentication.expire,
       },
       (error, result) => {
         if (error) {
