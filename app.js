@@ -24,6 +24,7 @@ const state = {
   },
   health: null,
   accessToken: localStorage.getItem("smartFarmAccessToken") || "",
+  loadGeneration: 0,
 };
 
 const {
@@ -36,6 +37,7 @@ const {
   summarize,
   validateFile,
   normalizeImageKitAuth,
+  connectionStatusForError,
 } = FarmCore;
 
 const expenseForm = document.getElementById("expenseForm");
@@ -82,6 +84,8 @@ function setConnectionStatus(status, text) {
   const classes = {
     online: "bg-emerald-500/15 text-emerald-400",
     offline: "bg-rose-500/15 text-rose-400",
+    unauthorized: "bg-amber-500/15 text-amber-400",
+    degraded: "bg-orange-500/15 text-orange-400",
     loading: "bg-amber-500/15 text-amber-400",
   };
   connectionStatus.className = `hidden sm:inline-flex text-[11px] px-2 py-1 rounded-full ${
@@ -141,7 +145,11 @@ async function fetchJson(url, options = {}) {
     if (error.name === "AbortError") {
       throw new ApiError("การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่", "TIMEOUT");
     }
-    throw error;
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(
+      error.message || "เชื่อมต่อ API ไม่สำเร็จ กรุณาลองใหม่",
+      "NETWORK_ERROR"
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -168,7 +176,7 @@ async function apiList(sheet) {
 }
 
 async function apiMutation(action, sheet, payload = {}) {
-  return fetchJson(CONFIG.API_URL, {
+  const result = await fetchJson(CONFIG.API_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
@@ -178,6 +186,8 @@ async function apiMutation(action, sheet, payload = {}) {
       ...payload,
     }),
   });
+  setConnectionStatus("online", "เชื่อมต่อแล้ว");
+  return result;
 }
 
 function getImageKitClient() {
@@ -272,7 +282,8 @@ function handleApiError(error, fallbackContainer) {
   console.error(error);
   if (error.code === "UNAUTHORIZED") showSettings();
   if (fallbackContainer) fallbackContainer.innerHTML = errorState(error.message);
-  setConnectionStatus("offline", "เชื่อมต่อไม่ได้");
+  const connection = connectionStatusForError(error.code);
+  setConnectionStatus(connection.status, connection.text);
   showToast(error.message || "เกิดข้อผิดพลาด", "error");
 }
 
@@ -577,15 +588,18 @@ function errorState(message) {
 }
 
 async function loadSheet(sheet) {
+  state.loadGeneration += 1;
   const rows = await apiList(sheet);
   state.data[sheet] = rows;
   if (sheet === "Expenses") renderExpenses();
   if (sheet === "Assets") renderAssets();
   if (sheet === "Livestock") renderLivestock();
   renderSummary();
+  setConnectionStatus("online", "เชื่อมต่อแล้ว");
 }
 
 async function loadAll({ notify = false } = {}) {
+  const generation = ++state.loadGeneration;
   setConnectionStatus("loading", "กำลังเชื่อมต่อ");
   expenseList.innerHTML = skeletonRows(3);
   assetTableBody.innerHTML =
@@ -599,6 +613,7 @@ async function loadAll({ notify = false } = {}) {
     const results = await Promise.all(
       Object.values(SHEETS).map(async (sheet) => [sheet, await apiList(sheet)])
     );
+    if (generation !== state.loadGeneration) return;
     results.forEach(([sheet, rows]) => {
       state.data[sheet] = rows;
     });
@@ -609,6 +624,7 @@ async function loadAll({ notify = false } = {}) {
     setConnectionStatus("online", "เชื่อมต่อแล้ว");
     if (notify) showToast("รีเฟรชข้อมูลเรียบร้อย", "success");
   } catch (error) {
+    if (generation !== state.loadGeneration) return;
     handleApiError(error);
     expenseList.innerHTML = errorState(error.message);
     assetTableBody.innerHTML = `<tr><td colspan="5">${errorState(

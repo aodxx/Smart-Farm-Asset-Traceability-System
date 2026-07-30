@@ -8,6 +8,9 @@
 
 ระบบใช้ GitHub Pages เป็นหน้าเว็บ, Google Sheets เป็นฐานข้อมูล, Google Apps Script เป็น API และ ImageKit เป็นพื้นที่เก็บรูป
 
+อ่านรายละเอียดสถาปัตยกรรม กระบวนการทำงาน และ Roadmap ได้ที่
+[`SYSTEM_OVERVIEW.md`](SYSTEM_OVERVIEW.md)
+
 ## ความสามารถใน v1.0
 
 - เพิ่ม แก้ไข ค้นหา กรอง และนำรายการออกจากหน้าหลัก

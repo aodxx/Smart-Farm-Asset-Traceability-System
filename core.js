@@ -105,6 +105,16 @@
         };
   }
 
+  function connectionStatusForError(code) {
+    if (code === "UNAUTHORIZED") {
+      return { status: "unauthorized", text: "Token ไม่ถูกต้อง" };
+    }
+    if (["TIMEOUT", "HTTP_ERROR", "NETWORK_ERROR"].includes(code)) {
+      return { status: "offline", text: "เชื่อมต่อไม่ได้" };
+    }
+    return { status: "degraded", text: "ระบบขัดข้องบางส่วน" };
+  }
+
   return {
     escapeHtml,
     safeImageUrl,
@@ -115,5 +125,6 @@
     summarize,
     validateFile,
     normalizeImageKitAuth,
+    connectionStatusForError,
   };
 });
