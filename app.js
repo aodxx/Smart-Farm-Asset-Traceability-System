@@ -4,7 +4,7 @@
 
 const CONFIG = {
   API_URL:
-    "https://script.google.com/macros/s/AKfycbyHwX6e4ZsPQUBvp1-iwOkxK6Dy_tlx8bUyWoS6faTlLhb8jSIXmyPfQQ4bCtYfekQ2ng/exec",
+    "https://script.google.com/macros/s/AKfycbxXqRJxbgJm4Gv_jwElgVgBgNy5shnzTkJ8sNK-LquQX71JxZyhQmVnDGcj9FMmLx4e/exec",
   IMAGEKIT_PUBLIC_KEY: "public_Or7oN0cYLa0ApQQhDxXqTx8huFQ=",
   IMAGEKIT_URL_ENDPOINT: "https://ik.imagekit.io/ahrkj8bof",
   REQUEST_TIMEOUT_MS: 20000,
